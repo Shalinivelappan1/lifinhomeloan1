@@ -28,7 +28,6 @@ with tab1:
 
     st.sidebar.header("Market")
     house_growth = st.sidebar.number_input("House growth %", value=0.0)
-    inv_return = st.sidebar.number_input("Investment return %", value=3.0)
     disc = st.sidebar.number_input("Discount rate %", value=3.0)
 
     st.sidebar.header("Exit")
@@ -50,7 +49,7 @@ with tab1:
     st.metric("Monthly EMI", f"{emi:,.2f}")
 
     # =====================================================
-    # CORE NPV FUNCTION (CORRECT)
+    # CORRECT NPV FUNCTION (CASE CONSISTENT)
     # =====================================================
     def compute_npv(hg, rg):
 
@@ -60,7 +59,7 @@ with tab1:
         # ---------- BUY ----------
         cf_buy = []
 
-        # initial cost
+        # initial cost (downpayment + stamp duty + agent + misc)
         initial = downpayment + price*buy_commission/100 + 0.03*price + 8000
         cf_buy.append(-initial)
 
@@ -72,15 +71,14 @@ with tab1:
             principal = emi - interest
             balance -= principal
 
-            cf = -(emi + monthly_costs)
-            cf_buy.append(cf)
+            cf_buy.append(-(emi + monthly_costs))
 
         # resale
         sale_price = price*(1+hg/100)**exit_year
         sale_net = sale_price*(1-sell_commission/100) - balance
         cf_buy[-1] += sale_net
 
-        # ---------- RENT ----------
+        # ---------- RENT (NO INVESTMENT — CASE LOGIC) ----------
         cf_rent = [0]
 
         rent = rent0
@@ -88,16 +86,13 @@ with tab1:
             rent = rent*(1+rg/100/12)
             cf_rent.append(-rent)
 
-        # invest downpayment monthly
-        invest = downpayment*(1+inv_return/100/12)**months
-        cf_rent[-1] += invest
-
+        # ---------- NPV ----------
         def npv(rate, cfs):
             return sum(cf/((1+rate)**i) for i, cf in enumerate(cfs))
 
         return npv(monthly_disc, cf_buy), npv(monthly_disc, cf_rent)
 
-    # ---------- SCENARIOS ----------
+    # ---------- SCENARIO TABLE ----------
     st.subheader("Scenario comparison")
 
     scenarios = {
