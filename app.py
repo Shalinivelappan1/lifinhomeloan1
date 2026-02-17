@@ -4,7 +4,7 @@ import pandas as pd
 import plotly.graph_objects as go
 
 st.set_page_config(layout="wide")
-st.title("🏠 Buy vs Rent — NPV Classroom Simulator")
+st.title("🏠 Buy vs Rent — NPV Simulator")
 st.caption("Developer: Dr. Shalini Velappan")
 
 tab1, tab2 = st.tabs(["Simulator", "Student Guide"])
@@ -14,7 +14,7 @@ tab1, tab2 = st.tabs(["Simulator", "Student Guide"])
 # =====================================================
 with tab1:
 
-    # ---------------- SIDEBAR ----------------
+    # ---------- INPUTS ----------
     st.sidebar.header("Property")
 
     price = st.sidebar.number_input("House price", value=1500000.0)
@@ -27,7 +27,7 @@ with tab1:
     rent_growth = st.sidebar.number_input("Rent growth %", value=0.0)
 
     st.sidebar.header("Market")
-    house_growth = st.sidebar.number_input("House price growth %", value=0.0)
+    house_growth = st.sidebar.number_input("House growth %", value=0.0)
     inv_return = st.sidebar.number_input("Investment return %", value=3.0)
     disc = st.sidebar.number_input("Discount rate %", value=3.0)
 
@@ -39,7 +39,7 @@ with tab1:
     sell_commission = st.sidebar.number_input("Sell commission %", value=1.0)
     monthly_costs = st.sidebar.number_input("Maintenance+tax+repairs (monthly)", value=450.0)
 
-    # ---------------- EMI ----------------
+    # ---------- EMI ----------
     downpayment = price * down_pct/100
     loan_amt = price - downpayment
 
@@ -49,31 +49,18 @@ with tab1:
     emi = loan_amt*r*(1+r)**n/((1+r)**n-1)
     st.metric("Monthly EMI", f"{emi:,.2f}")
 
-    # ---------------- AMORTIZATION ----------------
-    balance = loan_amt
-    balances = []
-
-    for m in range(exit_year*12):
-        interest = balance*r
-        principal = emi - interest
-        balance -= principal
-        balances.append(balance)
-
-    remaining_balance = balance
-
     # =====================================================
-    # NPV FUNCTION (MONTHLY — CASE CONSISTENT)
+    # CORE NPV FUNCTION (CORRECT)
     # =====================================================
-
     def compute_npv(hg, rg):
 
-        months = exit_year*12
+        months = int(exit_year*12)
         monthly_disc = disc/100/12
 
-        # BUY CASHFLOWS
+        # ---------- BUY ----------
         cf_buy = []
 
-        # time 0
+        # initial cost
         initial = downpayment + price*buy_commission/100 + 0.03*price + 8000
         cf_buy.append(-initial)
 
@@ -93,7 +80,7 @@ with tab1:
         sale_net = sale_price*(1-sell_commission/100) - balance
         cf_buy[-1] += sale_net
 
-        # RENT CASHFLOWS
+        # ---------- RENT ----------
         cf_rent = [0]
 
         rent = rent0
@@ -101,8 +88,8 @@ with tab1:
             rent = rent*(1+rg/100/12)
             cf_rent.append(-rent)
 
-        # invest down payment
-        invest = downpayment*(1+inv_return/100)**exit_year
+        # invest downpayment monthly
+        invest = downpayment*(1+inv_return/100/12)**months
         cf_rent[-1] += invest
 
         def npv(rate, cfs):
@@ -110,7 +97,7 @@ with tab1:
 
         return npv(monthly_disc, cf_buy), npv(monthly_disc, cf_rent)
 
-    # ---------------- SCENARIO TABLE ----------------
+    # ---------- SCENARIOS ----------
     st.subheader("Scenario comparison")
 
     scenarios = {
@@ -127,7 +114,7 @@ with tab1:
     df = pd.DataFrame(rows, columns=["Scenario","NPV Buy","NPV Rent","Buy-Rent"])
     st.dataframe(df)
 
-    # ---------------- SENSITIVITY ----------------
+    # ---------- SENSITIVITY ----------
     st.subheader("Growth sensitivity")
 
     g = st.slider("House growth", -5.0, 5.0, float(house_growth))
@@ -137,12 +124,13 @@ with tab1:
     col1.metric("NPV Buy", f"{b:,.0f}")
     col2.metric("NPV Rent", f"{rn:,.0f}")
 
-    # ---------------- MONTE CARLO ----------------
+    # ---------- MONTE CARLO ----------
     st.subheader("Monte Carlo")
 
     if st.button("Run Monte Carlo"):
         sims=500
         results=[]
+
         for _ in range(sims):
             hg=np.random.normal(house_growth,1)
             rg=np.random.normal(rent_growth,1)
@@ -161,24 +149,23 @@ with tab1:
 # =====================================================
 with tab2:
 
-    st.header("How to interpret results")
+    st.header("How to interpret")
 
     st.markdown("""
-### Decision rule
+**Decision rule**
+
 If NPV(Buy) > NPV(Rent) → Buy  
 If NPV(Rent) > NPV(Buy) → Rent  
 
-### When renting is better
+**When renting is better**
 - Short holding period  
-- Low house price growth  
+- Low price growth  
 - High interest rates  
-- High alternative investment returns  
 
-### When buying is better
+**When buying is better**
 - Long stay  
 - Strong price growth  
-- Rising rents  
+- Rising rent  
 
-### Key insight
-Small changes in assumptions flip the decision.
+Small assumption changes flip decisions.
 """)
